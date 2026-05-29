@@ -8,13 +8,11 @@ from scripts.bullet import Bullet, SlashWave
 
 DRAW_SIZE = 70
 
-# 근접 공격 범위 및 부채꼴 각도
 MELEE_RANGE  = 30
-MELEE_SPREAD = math.pi * 0.75   # ±75% π (≈135°)
+MELEE_SPREAD = math.pi * 0.75
 
 
 def _scale_frames(frames, size):
-    """프레임 리스트를 지정 크기로 스케일링하여 반환"""
     return [
         pygame.transform.scale(f.copy(), (size, size))
         for f in frames
@@ -38,16 +36,24 @@ class Player:
         self.state     = "IDLE"
         self.hit_timer = 0
         self.fire_cd   = 0
-        self._attack_queued = False
 
         # 근접+참격 공격 트리거
-        self._atk_angle        = 0.0
-        self._melee_triggered  = False
+        self._atk_angle       = 0.0
+        self._melee_triggered = False
 
-        # 애니메이션은 최초 draw/update 시 로드
+        # 공격 애니메이션이 막 설정된 틱에서 update() advance를 건너뜀
+        # → handle_event(설정) → update(advance) 구조로 첫 프레임이
+        #   speed-1 틱만 표시되는 문제 수정
+        self._anim_just_set = False
+
+        # 애니메이션을 __init__ 에서 즉시 로드(지연 로드 제거)
+        # → 큐잉으로 인한 1프레임 공백 완전 제거
         self._anims_loaded = False
         self._anims = {}
         self._cur_anim = None
+        self._ensure_anims()
+
+    # ── 애니메이션 로드 ────────────────────────────────────
 
     def _ensure_anims(self):
         if self._anims_loaded:
@@ -66,16 +72,16 @@ class Player:
         self._cur_anim = self._anims["IDLE"]
         self._anims_loaded = True
 
-        if self._attack_queued:
-            self._apply_attack_state()
-            self._attack_queued = False
-
     def _apply_attack_state(self):
-        """ATTACK 애니메이션 강제 시작"""
+        """ATTACK 애니메이션 강제 시작.
+        _anim_just_set 플래그를 세워 이번 틱의 advance를 막는다."""
         self.state = "ATTACK"
         anim = self._anims["ATTACK"]
         anim.reset()
         self._cur_anim = anim
+        self._anim_just_set = True   # 이 틱에서는 advance 건너뜀
+
+    # ── 이동 / 입력 ────────────────────────────────────────
 
     def get_rect(self):
         r = self.radius
@@ -122,14 +128,10 @@ class Player:
             self._anims[new_state].reset()
             self._cur_anim = self._anims[new_state]
 
+    # ── 공격 ───────────────────────────────────────────────
+
     def try_shoot(self, mouse_pos, cam_x, cam_y):
-        """
-        공격 시도:
-        1) ATTACK 애니메이션 재생
-        2) 근접 판정 트리거 — consume_melee()로 즉시 범위 내 적 타격
-        3) SlashWave 참격 투사체 반환
-        쿨다운 중이면 None 반환.
-        """
+        """공격 시도. 쿨다운 중이면 None 반환."""
         if self.fire_cd > 0:
             return None
         wx = mouse_pos[0] + cam_x
@@ -138,27 +140,18 @@ class Player:
         self.fire_cd          = self.fire_rate
         self._melee_triggered = True
 
-        # anims가 이미 로드된 경우 즉시 적용 → 큐잉으로 인한 1프레임 공백 제거
-        if self._anims_loaded:
-            self._apply_attack_state()
-        else:
-            self._attack_queued = True
+        # 애니메이션은 항상 즉시 적용 (__init__ 에서 로드 보장)
+        self._apply_attack_state()
 
-        return SlashWave(self.x, self.y, self._atk_angle,
-                         damage=self.damage)
+        return SlashWave(self.x, self.y, self._atk_angle, damage=self.damage)
 
     def consume_melee(self):
-        """
-        stage1.update() 에서 호출.
-        근접 판정이 대기 중이면 (True, angle) 반환 후 플래그 클리어.
-        """
         if self._melee_triggered:
             self._melee_triggered = False
             return True, self._atk_angle
         return False, 0.0
 
     def melee_hits(self, ex, ey):
-        """(ex, ey) 가 현재 근접 공격 부채꼴 안에 있는지 확인."""
         dx   = ex - self.x
         dy   = ey - self.y
         dist = math.hypot(dx, dy)
@@ -169,6 +162,8 @@ class Player:
                                   math.cos(angle_to - self._atk_angle)))
         return diff < MELEE_SPREAD
 
+    # ── 업데이트 ───────────────────────────────────────────
+
     def update(self):
         self._ensure_anims()
 
@@ -177,12 +172,14 @@ class Player:
         if self.hit_timer > 0:
             self.hit_timer -= 1
 
-        if self._attack_queued and self._anims_loaded:
-            self._apply_attack_state()
-            self._attack_queued = False
-
         if self._cur_anim:
-            self._cur_anim.update()
+            if self._anim_just_set:
+                # 이 틱은 방금 새 애니메이션이 설정됐으므로 advance 건너뜀
+                # → 0번 프레임이 정확히 speed 틱 동안 표시됨
+                self._anim_just_set = False
+            else:
+                self._cur_anim.update()
+
             if self._cur_anim.done and self.state in ("ATTACK", "HIT"):
                 self.state = "IDLE"
                 self._anims["IDLE"].reset()
@@ -193,12 +190,10 @@ class Player:
             return False
         self.hp -= amount
         self.hit_timer = 60
-        if self._anims_loaded:
-            self.state = "HIT"
-            self._anims["HIT"].reset()
-            self._cur_anim = self._anims["HIT"]
-        else:
-            self.state = "HIT"
+        self.state = "HIT"
+        self._anims["HIT"].reset()
+        self._cur_anim = self._anims["HIT"]
+        self._anim_just_set = True   # HIT도 동일하게 첫 프레임 보호
         if self.hp < 0:
             self.hp = 0
         return True
@@ -206,12 +201,13 @@ class Player:
     def is_dead(self):
         return self.hp <= 0
 
+    # ── 그리기 ─────────────────────────────────────────────
+
     def draw(self, screen, cam_x, cam_y):
         self._ensure_anims()
         if not self._cur_anim:
             return
 
-        # 피격 깜빡임: HIT 상태일 때만 적용 (ATTACK 중에는 깜빡이지 않음)
         if self.state == "HIT" and self.hit_timer > 0 and (self.hit_timer // 4) % 2 == 0:
             return
 
