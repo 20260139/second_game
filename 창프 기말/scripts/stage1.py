@@ -353,22 +353,40 @@ class Stage1:
                     walls.append(dr)
         return walls
 
-    def _get_cam(self, screen):
-        sw, sh = screen.get_size()
+    # 월드를 그릴 뷰포트 크기 (800x600보다 작을수록 줌인)
+    ZOOM_W = 620
+    ZOOM_H = 465
+    # 가상 캔버스 기준 크기 (main.py BASE_W, BASE_H 와 동일)
+    CANVAS_W = 800
+    CANVAS_H = 600
+
+    def _get_cam(self, screen=None):
+        """항상 ZOOM 뷰포트 기준으로 카메라 계산"""
         p = self.player
-
-        cam_x = int(p.x) - sw // 2
-        cam_y = int(p.y) - sh // 2
-
+        cam_x = int(p.x) - self.ZOOM_W // 2
+        cam_y = int(p.y) - self.ZOOM_H // 2
         return cam_x, cam_y
+
+    def _canvas_to_vp(self, pos):
+        """
+        캔버스 좌표(0~CANVAS_W, 0~CANVAS_H) →
+        뷰포트 좌표(0~ZOOM_W, 0~ZOOM_H) 변환.
+        줌인 후 마우스 위치·조준 각도 계산에 사용.
+        """
+        cx, cy = pos
+        vx = cx * self.ZOOM_W / self.CANVAS_W
+        vy = cy * self.ZOOM_H / self.CANVAS_H
+        return (int(vx), int(vy))
 
     # ── 이벤트 ───────────────────────────────────────────
 
     def handle_event(self, event, gm):
         p = self.player
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            cam_x, cam_y = self._get_cam(pygame.display.get_surface())
-            b = p.try_shoot(event.pos, cam_x, cam_y)
+            cam_x, cam_y = self._get_cam()
+            # 캔버스 좌표 -> 뷰포트 좌표로 변환해야 올바른 조준 각도 계산
+            vp_pos = self._canvas_to_vp(event.pos)
+            b = p.try_shoot(vp_pos, cam_x, cam_y)
             if b:
                 from scripts.bullet import SlashWave
                 if isinstance(b, SlashWave):
@@ -382,9 +400,11 @@ class Stage1:
         self._tick += 1
         p     = self.player
         walls = self._current_walls()
-        cam_x, cam_y = self._get_cam(pygame.display.get_surface())
+        cam_x, cam_y = self._get_cam()
 
-        p.handle_input(keys, mouse_pos, walls, cam_x, cam_y)
+        # 캔버스 좌표 -> 뷰포트 좌표로 변환 (flip 방향·조준 판정에 사용)
+        vp_mouse = self._canvas_to_vp(mouse_pos)
+        p.handle_input(keys, vp_mouse, walls, cam_x, cam_y)
 
         # ── 근접 공격 판정 — p.update() 전에 플래그 소비 ──
         melee_ok, _ = p.consume_melee()
@@ -596,104 +616,112 @@ class Stage1:
     # ── 그리기 ───────────────────────────────────────────
 
     def draw(self, screen, gm):
-        sw, sh = screen.get_size()
-        cam_x, cam_y = self._get_cam(screen)
-        screen.fill((20,16,32))
+        """
+        월드(타일·스프라이트)는 ZOOM 뷰포트에 그린 뒤 canvas(screen)로 확대.
+        HUD(HP바·스코어·미니맵·방이름)는 canvas에 직접 그려 선명하게 유지.
+        """
+        sw, sh = screen.get_size()          # canvas 크기 (800x600)
+        vw, vh = self.ZOOM_W, self.ZOOM_H   # 뷰포트 크기 (작음 = 줌인)
+        cam_x, cam_y = self._get_cam()
+
+        # 월드를 뷰포트(vp)에 그린다
+        vp = pygame.Surface((vw, vh))
+        vp.fill((20, 16, 32))
 
         # 바닥
         for (fx, fy, is_boss) in self.floors:
-            sx, sy = fx-cam_x, fy-cam_y
-            if -TILE < sx < sw+TILE and -TILE < sy < sh+TILE:
+            sx, sy = fx - cam_x, fy - cam_y
+            if -TILE < sx < vw + TILE and -TILE < sy < vh + TILE:
                 if is_boss:
-                    col = C_BOSS_FLOOR if (fx//TILE+fy//TILE)%2==0 else C_BOSS_FLOOR2
+                    col = C_BOSS_FLOOR if (fx//TILE + fy//TILE) % 2 == 0 else C_BOSS_FLOOR2
                 else:
-                    col = C_FLOOR     if (fx//TILE+fy//TILE)%2==0 else C_FLOOR2
-                pygame.draw.rect(screen, col, (sx,sy,TILE,TILE))
+                    col = C_FLOOR      if (fx//TILE + fy//TILE) % 2 == 0 else C_FLOOR2
+                pygame.draw.rect(vp, col, (sx, sy, TILE, TILE))
 
         # 정적 벽
         for w in self.walls:
             r = w.move(-cam_x, -cam_y)
-            if r.right<0 or r.left>sw or r.bottom<0 or r.top>sh: continue
-            pygame.draw.rect(screen, C_WALL, r)
-            pygame.draw.rect(screen, C_WALL_TOP, pygame.Rect(r.x,r.y,r.w,6))
+            if r.right < 0 or r.left > vw or r.bottom < 0 or r.top > vh:
+                continue
+            pygame.draw.rect(vp, C_WALL, r)
+            pygame.draw.rect(vp, C_WALL_TOP, pygame.Rect(r.x, r.y, r.w, 6))
 
         # 문 그리기
         for room in self.rooms:
             for d, dw in self.door_rects[room.room_idx].items():
                 r = dw.move(-cam_x, -cam_y)
-                if r.right<0 or r.left>sw or r.bottom<0 or r.top>sh: continue
-
+                if r.right < 0 or r.left > vw or r.bottom < 0 or r.top > vh:
+                    continue
                 if room.cleared or not room.activated:
-                    # 열린 문: 바닥색으로 채워서 통로처럼 보임
-                    pygame.draw.rect(screen, C_DOOR_OPEN, r)
+                    pygame.draw.rect(vp, C_DOOR_OPEN, r)
                 elif room.locked:
-                    # 닫힌 문: 빨간색 + 남은 적 수 표시
-                    pygame.draw.rect(screen, C_DOOR_CLOSE, r)
-                    pygame.draw.rect(screen, (220,80,80), r, 2)
+                    pygame.draw.rect(vp, C_DOOR_CLOSE, r)
+                    pygame.draw.rect(vp, (220, 80, 80), r, 2)
                     remain = len(self._enemies_in_room(room.room_idx))
                     font_d = pygame.font.SysFont(None, 18)
-                    dt = font_d.render(f"×{remain}", True, (255,220,220))
-                    screen.blit(dt, (r.centerx-dt.get_width()//2, r.centery-7))
+                    dt = font_d.render(f"x{remain}", True, (255, 220, 220))
+                    vp.blit(dt, (r.centerx - dt.get_width()//2, r.centery - 7))
 
-        # 문 위에 벽 상단 하이라이트 (locked 문을 벽처럼 보이게)
+        # 문 위 벽 하이라이트
         for room in self.rooms:
             if room.locked:
                 for d, dw in self.door_rects[room.room_idx].items():
                     r = dw.move(-cam_x, -cam_y)
-                    pygame.draw.rect(screen, C_WALL_TOP, pygame.Rect(r.x,r.y,r.w,6))
+                    pygame.draw.rect(vp, C_WALL_TOP, pygame.Rect(r.x, r.y, r.w, 6))
 
         # 출구
-        boss = next(r for r in self.rooms if r.is_boss)
-        if boss.cleared:
+        boss_r = next(r for r in self.rooms if r.is_boss)
+        if boss_r.cleared:
             er = self.exit_rect.move(-cam_x, -cam_y)
-            pulse = int(abs(math.sin(self._tick*0.05))*40)
-            pygame.draw.rect(screen, (60+pulse, 200+pulse//2, 120), er, border_radius=4)
-            pygame.draw.rect(screen, C_EXIT, er, 3, border_radius=4)
-            font_e = pygame.font.SysFont(None,22)
-            et = font_e.render("EXIT", True, (20,20,20))
-            screen.blit(et,(er.centerx-et.get_width()//2, er.centery-et.get_height()//2))
+            pulse = int(abs(math.sin(self._tick * 0.05)) * 40)
+            pygame.draw.rect(vp, (60 + pulse, 200 + pulse//2, 120), er, border_radius=4)
+            pygame.draw.rect(vp, C_EXIT, er, 3, border_radius=4)
+            font_e = pygame.font.SysFont(None, 22)
+            et = font_e.render("EXIT", True, (20, 20, 20))
+            vp.blit(et, (er.centerx - et.get_width()//2, er.centery - et.get_height()//2))
 
         # 방 라벨
-        font_rl = pygame.font.SysFont(None,20)
+        font_rl = pygame.font.SysFont(None, 20)
         for room in self.rooms:
-            cx,cy = room.center()
-            sx,sy = cx-cam_x, cy-cam_y
-            if 0<sx<sw and 0<sy<sh:
-                if room.is_boss:   lbl,col = "BOSS",(255,200,80)
-                elif room.is_start:lbl,col = "START",(150,220,150)
-                else:              lbl,col = f"R{room.room_idx}",(160,140,200)
-                lt = font_rl.render(lbl,True,col)
-                screen.blit(lt,(sx-lt.get_width()//2, sy-room.rh//2+4))
+            cx, cy = room.center()
+            sx, sy = cx - cam_x, cy - cam_y
+            if 0 < sx < vw and 0 < sy < vh:
+                if room.is_boss:    lbl, col = "BOSS",  (255, 200, 80)
+                elif room.is_start: lbl, col = "START", (150, 220, 150)
+                else:               lbl, col = f"R{room.room_idx}", (160, 140, 200)
+                lt = font_rl.render(lbl, True, col)
+                vp.blit(lt, (sx - lt.get_width()//2, sy - room.rh//2 + 4))
 
-        # 코인 / 적탄 / 적 / 보스 / 플탄 / 참격 / 플레이어
-        for c in self.coins:           c.draw(screen, cam_x, cam_y)
-        for b in self.e_bullets:       b.draw(screen, cam_x, cam_y)
-        for e in self.enemies:         e.draw(screen, cam_x, cam_y)
+        # 코인·적탄·적·보스·플탄·참격·플레이어
+        for c in self.coins:         c.draw(vp, cam_x, cam_y)
+        for b in self.e_bullets:     b.draw(vp, cam_x, cam_y)
+        for e in self.enemies:       e.draw(vp, cam_x, cam_y)
         if self.boss and not self.boss.is_dead():
-            self.boss.draw(screen, cam_x, cam_y)
-        for b in self.bullets:         b.draw(screen, cam_x, cam_y)
-        for s in self.slash_effects:   s.draw(screen, cam_x, cam_y)
-        self.player.draw(screen, cam_x, cam_y)
+            self.boss.draw(vp, cam_x, cam_y)
+        for b in self.bullets:       b.draw(vp, cam_x, cam_y)
+        for s in self.slash_effects: s.draw(vp, cam_x, cam_y)
+        self.player.draw(vp, cam_x, cam_y)
 
+        # 뷰포트를 canvas(screen) 크기로 확대
+        pygame.transform.scale(vp, (sw, sh), screen)
+
+        # HUD는 canvas에 직접 그려 선명하게 유지
         self.player.draw_hud(screen, sw, sh)
         self._draw_hud(screen, gm, sw, sh)
 
-        # 보스방에 있을 때 보스 HP바 표시
         cur = self._current_room()
         if cur.is_boss and self.boss and not self.boss.is_dead():
             self.boss.draw_boss_bar(screen, sw)
 
-        # 방 이름 (상단 중앙)
-        cur = self._current_room()
         if cur.is_boss:
-            rname,nc = "⚔  BOSS ROOM",(255,80,80)
+            rname, nc = "BOSS ROOM", (255, 80, 80)
         elif cur.is_start:
-            rname,nc = "Start Room",(150,220,150)
+            rname, nc = "Start Room", (150, 220, 150)
         else:
-            rname,nc = f"Room {cur.room_idx}",(180,160,220)
-        font_room = pygame.font.SysFont(None,28)
-        rt = font_room.render(rname,True,nc)
-        screen.blit(rt,(sw//2-rt.get_width()//2,8))
+            rname, nc = f"Room {cur.room_idx}", (180, 160, 220)
+        font_room = pygame.font.SysFont(None, 28)
+        rt = font_room.render(rname, True, nc)
+        screen.blit(rt, (sw//2 - rt.get_width()//2, 8))
 
         self._draw_minimap(screen, sw, sh)
 
