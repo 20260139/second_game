@@ -213,6 +213,7 @@ class Boss:
         self._wall_set    = None
         self._wall_set_id = None
         self._has_los     = False
+        self._room_rect   = None   # 보스방 경계 (순간이동 범위 제한용)
 
         # 애니메이션
         if Boss._frames_cache is None:
@@ -315,8 +316,10 @@ class Boss:
 
     # ── 메인 업데이트 ────────────────────────────────────
 
-    def update(self, player, walls):
+    def update(self, player, walls, room_rect=None):
         """반환값: 발사된 EnemyBullet 리스트"""
+        if room_rect is not None:
+            self._room_rect = room_rect
         if not self.alive:
             return []
 
@@ -438,11 +441,35 @@ class Boss:
         elif self._pattern == PAT_TELE_OUT:
             self._alpha = max(0, int(255 * (self._pat_timer / 35)))
             if self._pat_timer <= 0:
-                # 플레이어 근처 빈 곳에 재등장
-                angle      = random.uniform(0, math.pi * 2)
-                dist_tele  = random.randint(100, 180)
-                self.x     = px + math.cos(angle) * dist_tele
-                self.y     = py + math.sin(angle) * dist_tele
+                # 플레이어 근처 빈 곳에 재등장 — 방 경계 + 벽 충돌 검사
+                r = self.RADIUS
+                margin = r + 8   # 벽 여백
+
+                # room_rect 가 있으면 그 안으로 제한, 없으면 넓은 범위 허용
+                if self._room_rect is not None:
+                    rx  = self._room_rect.left   + margin
+                    ry  = self._room_rect.top    + margin
+                    rr  = self._room_rect.right  - margin
+                    rb  = self._room_rect.bottom - margin
+                else:
+                    rx, ry, rr, rb = px - 400, py - 400, px + 400, py + 400
+
+                # 최대 20회 시도해 벽에 겹치지 않는 좌표 선택
+                for _ in range(20):
+                    angle     = random.uniform(0, math.pi * 2)
+                    dist_tele = random.randint(100, 180)
+                    nx = px + math.cos(angle) * dist_tele
+                    ny = py + math.sin(angle) * dist_tele
+                    # 방 경계 clamp
+                    nx = max(rx, min(rr, nx))
+                    ny = max(ry, min(rb, ny))
+                    # 벽 충돌 검사
+                    test_rect = pygame.Rect(int(nx)-r, int(ny)-r, r*2, r*2)
+                    if not any(test_rect.colliderect(w) for w in walls):
+                        break   # 유효한 위치 찾음
+                # 최대 시도 후에도 벽 충돌 시 보스방 중심으로 fallback
+                self.x = float(nx)
+                self.y = float(ny)
                 self._tele_target = (px, py)
                 self._pattern   = PAT_TELE_IN
                 self._pat_timer = 30

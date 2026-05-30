@@ -41,13 +41,7 @@ class Player:
         self._atk_angle       = 0.0
         self._melee_triggered = False
 
-        # 공격 애니메이션이 막 설정된 틱에서 update() advance를 건너뜀
-        # → handle_event(설정) → update(advance) 구조로 첫 프레임이
-        #   speed-1 틱만 표시되는 문제 수정
-        self._anim_just_set = False
-
         # 애니메이션을 __init__ 에서 즉시 로드(지연 로드 제거)
-        # → 큐잉으로 인한 1프레임 공백 완전 제거
         self._anims_loaded = False
         self._anims = {}
         self._cur_anim = None
@@ -73,13 +67,11 @@ class Player:
         self._anims_loaded = True
 
     def _apply_attack_state(self):
-        """ATTACK 애니메이션 강제 시작.
-        _anim_just_set 플래그를 세워 이번 틱의 advance를 막는다."""
+        """ATTACK 애니메이션 강제 시작."""
         self.state = "ATTACK"
         anim = self._anims["ATTACK"]
         anim.reset()
         self._cur_anim = anim
-        self._anim_just_set = True   # 이 틱에서는 advance 건너뜀
 
     # ── 이동 / 입력 ────────────────────────────────────────
 
@@ -173,12 +165,7 @@ class Player:
             self.hit_timer -= 1
 
         if self._cur_anim:
-            if self._anim_just_set:
-                # 이 틱은 방금 새 애니메이션이 설정됐으므로 advance 건너뜀
-                # → 0번 프레임이 정확히 speed 틱 동안 표시됨
-                self._anim_just_set = False
-            else:
-                self._cur_anim.update()
+            self._cur_anim.update()
 
             if self._cur_anim.done and self.state in ("ATTACK", "HIT"):
                 self.state = "IDLE"
@@ -193,7 +180,6 @@ class Player:
         self.state = "HIT"
         self._anims["HIT"].reset()
         self._cur_anim = self._anims["HIT"]
-        self._anim_just_set = True   # HIT도 동일하게 첫 프레임 보호
         if self.hp < 0:
             self.hp = 0
         return True
@@ -211,12 +197,22 @@ class Player:
         if self.state == "HIT" and self.hit_timer > 0 and (self.hit_timer // 4) % 2 == 0:
             return
 
+        sx = int(self.x) - cam_x - DRAW_SIZE // 2
+        sy = int(self.y) - cam_y - DRAW_SIZE // 2
+
+        # ATTACK 상태: 일부 프레임(26,27)은 검 이펙트 오버레이만 있고
+        # 플레이어 몸체가 없어 투명하게 보임.
+        # IDLE 기본 스프라이트를 먼저 깔고, 공격 프레임을 위에 덧그려
+        # 몸체가 사라지지 않으면서 검 이펙트도 표시된다.
+        if self.state == "ATTACK":
+            base = self._anims["IDLE"].get_image()
+            if self.flip:
+                base = pygame.transform.flip(base, True, False)
+            screen.blit(base, (sx, sy))
+
         img = self._cur_anim.get_image()
         if self.flip:
             img = pygame.transform.flip(img, True, False)
-
-        sx = int(self.x) - cam_x - DRAW_SIZE // 2
-        sy = int(self.y) - cam_y - DRAW_SIZE // 2
         screen.blit(img, (sx, sy))
 
     def draw_hud(self, screen, sw, sh):

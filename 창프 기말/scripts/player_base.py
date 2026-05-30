@@ -31,8 +31,7 @@ IDLE_0   = [player_frames[i] for i in range(0 * COLS, 0 * COLS + 8)]
 # WALK: 1번 행 0~7번 열 (8프레임)
 MOVE_0   = [player_frames[i] for i in range(1 * COLS, 1 * COLS + 8)]
 
-# ATTACK: 2번 행(인덱스 28~)부터 사용.
-# 26(1행 12열), 27(1행 13열)은 MOVE 행의 빈 여백 셀 -> 투명 프레임이므로 제외.
-# 실제 공격 프레임은 2번 행 0~3열(인덱스 28~31).
-# 프레임 수 조정이 필요하면 아래 숫자(4)만 바꾸면 됨.
-ATTACK_0 = [player_frames[i] for i in range(2 * COLS, 2 * COLS + 4)]
+# ATTACK: 원본 코드의 인덱스 [26, 27, 28, 29] 유지 → 필요 시 8프레임으로 확장
+# 26 = 1*14+12 (1번 행 12~13열 + 2번 행 0~1열)
+# 8프레임이 필요하면: range(2*COLS, 2*COLS+8) 으로 변경
+ATTACK_0 = [player_frames[i] for i in [26, 27, 28, 29]]

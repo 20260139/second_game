@@ -434,6 +434,7 @@ class Stage1:
                         self.boss.take_damage(p.damage)
                         if self.boss.is_dead():
                             gm.score += self.boss.score
+                            gm.reroll_tickets += 1   # 보스 처치 → 리롤권 1개 드롭
                             for _ in range(random.randint(5, 8)):
                                 self.coins.append(Coin(
                                     self.boss.x + random.randint(-30, 30),
@@ -488,7 +489,9 @@ class Stage1:
         if self.boss and not self.boss.is_dead():
             boss_room = next((r for r in self.rooms if r.is_boss), None)
             if boss_room and boss_room.activated and not boss_room.cleared:
-                new_bullets = self.boss.update(p, walls)
+                boss_rect   = pygame.Rect(boss_room.px, boss_room.py,
+                                          boss_room.rw, boss_room.rh)
+                new_bullets = self.boss.update(p, walls, room_rect=boss_rect)
                 self.e_bullets.extend(new_bullets)
                 # 보스 근접 충돌 (보스가 플레이어에 닿으면 피해)
                 if math.hypot(p.x-self.boss.x, p.y-self.boss.y) < p.radius + self.boss.RADIUS + 2:
@@ -522,6 +525,7 @@ class Stage1:
                         b.alive = False
                         if self.boss.is_dead():
                             gm.score += self.boss.score
+                            gm.reroll_tickets += 1   # 보스 처치 → 리롤권 1개 드롭
                             for _ in range(random.randint(5, 8)):
                                 self.coins.append(Coin(
                                     self.boss.x + random.randint(-30, 30),
@@ -559,6 +563,7 @@ class Stage1:
                         s.alive = False
                         if self.boss.is_dead():
                             gm.score += self.boss.score
+                            gm.reroll_tickets += 1   # 보스 처치 → 리롤권 1개 드롭
                             for _ in range(random.randint(5, 8)):
                                 self.coins.append(Coin(
                                     self.boss.x + random.randint(-30, 30),
