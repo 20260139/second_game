@@ -130,8 +130,8 @@ while running:
 
             if event.key == pygame.K_r:
                 if gm.state in ("GAMEOVER", "CLEAR"):
-                    player.hp = player.max_hp
-                    gm.state  = "LOBBY"
+                    lobby.on_enter_lobby()   # 스탯 초기화 + 새 주사위 롤
+                    gm.state = "LOBBY"
 
         # 마우스 이벤트의 pos를 캔버스 좌표로 변환
         if event.type == pygame.MOUSEBUTTONDOWN:
