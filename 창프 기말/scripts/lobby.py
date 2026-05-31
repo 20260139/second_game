@@ -272,6 +272,16 @@ class Lobby:
         sub = font_sub.render("Click a die to reroll it  |  Roll the dice. Choose your fate.", True, C_GRAY)
         screen.blit(sub, (sw//2 - sub.get_width()//2, 80))
 
+        # 스테이지 표시
+        stage_num = getattr(gm, 'stage', 1)
+        stage_colors = [(120,220,120),(100,180,255),(200,120,255),(255,160,60),(255,80,80)]
+        sc = stage_colors[min(stage_num-1,4)]
+        font_st = pygame.font.SysFont(None, 32)
+        boss_names = {1:"Dark Lich",2:"Iron Golem",3:"Phantom Witch",4:"Thunder Drake",5:"Chaos Lord"}
+        st_txt = font_st.render(f"STAGE  {stage_num} / 5   ─   Boss: {boss_names.get(stage_num,'?')}", True, sc)
+        pygame.draw.rect(screen, (20,16,38), (sw//2-st_txt.get_width()//2-10, 100, st_txt.get_width()+20, 28), border_radius=6)
+        screen.blit(st_txt, (sw//2-st_txt.get_width()//2, 103))
+
         # ── 캐릭터 패널 (좌측) ──────────────────────────
         char_rect = pygame.Rect(30, 108, 210, 360)
         pygame.draw.rect(screen, C_PANEL, char_rect, border_radius=12)

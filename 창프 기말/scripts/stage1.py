@@ -156,8 +156,9 @@ class Room:
 
 class Stage1:
 
-    def __init__(self, player):
+    def __init__(self, player, stage_num=1):
         self.player    = player
+        self.stage_num = stage_num
         self.bullets       = []
         self.e_bullets     = []
         self.slash_effects = []   # 참격 SlashWave 투사체
@@ -180,6 +181,17 @@ class Stage1:
         start_room = next((r for r in self.rooms if r.is_start), None)
         if start_room:
             self._visited_rooms.add(start_room.room_idx)
+
+        # 스테이지 난이도 스케일링
+        hp_mult  = 1.0 + (self.stage_num - 1) * 0.4
+        spd_mult = 1.0 + (self.stage_num - 1) * 0.12
+        for e in self.enemies:
+            e.max_hp = int(e.max_hp * hp_mult)
+            e.hp     = e.max_hp
+            e.speed  = round(e.speed * spd_mult, 2)
+        # 보스 HP 스케일링 (Boss 고유 MAX_HP × 스테이지 배율)
+        if self.boss:
+            self.boss.hp = self.boss.MAX_HP
 
     # ── 맵 생성 ──────────────────────────────────────────
 
@@ -296,7 +308,9 @@ class Stage1:
                 # 보스방: 보스 1마리 + 잡몹 약간
                 cx = ox + RW//2
                 cy = oy + RH//2
-                self.boss = Boss(float(cx), float(cy))
+                BOSS_MAP = {1: Boss, 2: Boss2, 3: Boss3, 4: Boss4, 5: Boss5}
+                BossClass = BOSS_MAP.get(self.stage_num, Boss)
+                self.boss = BossClass(float(cx), float(cy))
                 self.boss._room_idx = room.room_idx
                 # 보스방 잡몹
                 kinds = ["slime", "bat", "bat"]

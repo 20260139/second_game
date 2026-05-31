@@ -72,7 +72,7 @@ stage1 = None   # 스테이지는 STAGE1 진입 시 생성
 
 def new_stage():
     global stage1
-    stage1 = Stage1(player)
+    stage1 = Stage1(player, stage_num=gm.stage)
 
 
 # ── 화면 함수: canvas 대신 screen에 직접 그려 선명한 텍스트 ──
@@ -102,6 +102,22 @@ def draw_clear(gm):
     screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.62)))
 
 
+def draw_final_clear(gm):
+    sw, sh = screen.get_size()
+    screen.fill((5, 5, 20))
+    font1 = scaled_font(70)
+    font2 = scaled_font(34)
+    font3 = scaled_font(26)
+    t1 = font1.render("ALL STAGES  CLEAR!", True, (255, 220, 60))
+    t2 = font2.render(f"Score: {gm.score}    Coins: {gm.coins}", True, (220, 200, 255))
+    t3 = font3.render("You conquered all 5 floors!", True, (180, 160, 220))
+    t4 = font2.render("Press  R  to start over", True, (140, 130, 160))
+    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh*0.22)))
+    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh*0.42)))
+    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh*0.52)))
+    screen.blit(t4, (sw//2 - t4.get_width()//2, int(sh*0.62)))
+
+
 # ── 메인 루프 ─────────────────────────────────────────────
 running = True
 
@@ -129,8 +145,23 @@ while running:
                     running = False   # 로비에서 ESC → 종료
 
             if event.key == pygame.K_r:
-                if gm.state in ("GAMEOVER", "CLEAR"):
-                    lobby.on_enter_lobby()   # 스탯 초기화 + 새 주사위 롤
+                if gm.state == "GAMEOVER":
+                    lobby.on_enter_lobby()
+                    gm.stage = 1
+                    gm.state = "LOBBY"
+                elif gm.state == "CLEAR":
+                    if gm.stage >= 5:
+                        gm.state = "FINAL_CLEAR"
+                    else:
+                        gm.stage += 1
+                        lobby.on_enter_lobby()
+                        gm.state = "LOBBY"
+                elif gm.state == "FINAL_CLEAR":
+                    lobby.on_enter_lobby()
+                    gm.stage = 1
+                    gm.score = 0
+                    gm.coins = 0
+                    gm.reroll_tickets = 0
                     gm.state = "LOBBY"
 
         # 마우스 이벤트의 pos를 캔버스 좌표로 변환
@@ -183,6 +214,9 @@ while running:
 
     elif gm.state == "CLEAR":
         draw_clear(gm)
+
+    elif gm.state == "FINAL_CLEAR":
+        draw_final_clear(gm)
 
     pygame.display.flip()
 
