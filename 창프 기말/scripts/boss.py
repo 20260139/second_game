@@ -315,8 +315,10 @@ class Boss:
 
     # ── 메인 업데이트 ────────────────────────────────────
 
-    def update(self, player, walls):
+    def update(self, player, walls, room_rect=None):
         """반환값: 발사된 EnemyBullet 리스트"""
+        if room_rect is not None:
+            self._room_rect = room_rect
         if not self.alive:
             return []
 

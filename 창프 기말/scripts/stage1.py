@@ -2,7 +2,7 @@
 
 import pygame, math, random
 from scripts.enemy import Enemy
-from scripts.boss  import Boss
+from scripts.boss  import Boss, Boss2, Boss3, Boss4, Boss5
 from scripts.bullet import Bullet
 
 TILE           = 32
