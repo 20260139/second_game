@@ -94,12 +94,14 @@ def draw_clear(gm):
     screen.fill((5, 15, 10))
     font1 = scaled_font(80)
     font2 = scaled_font(34)
-    t1 = font1.render("STAGE  CLEAR!", True, (100, 255, 160))
+    font3 = scaled_font(26)
+    prev_stage = gm.stage - 1   # stage1.py에서 이미 +1 됐으므로
+    t1 = font1.render(f"FLOOR {prev_stage}  CLEAR!", True, (100, 255, 160))
     t2 = font2.render(f"Score: {gm.score}    Coins: {gm.coins}", True, (200, 240, 210))
-    t3 = font2.render("Press  R  to return to Lobby", True, (140, 180, 150))
-    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh * 0.33)))
-    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh * 0.52)))
-    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.62)))
+    t3 = font3.render(f"Next: Floor {gm.stage}  ─  Press  R  to enter", True, (140, 220, 180))
+    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh * 0.28)))
+    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh * 0.48)))
+    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.60)))
 
 
 def draw_final_clear(gm):
