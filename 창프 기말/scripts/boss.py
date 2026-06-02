@@ -310,7 +310,6 @@ class Boss:
                 PAT_CHARGE_W,
                 PAT_CROSS_1,
                 PAT_SPIRAL,
-                PAT_TELE_OUT,
             ])
 
     # ── 메인 업데이트 ────────────────────────────────────
@@ -436,31 +435,6 @@ class Boss:
                 self._pattern   = PAT_WANDER
                 self._pat_timer = random.randint(50, 90)
 
-        # ── TELE_OUT (페이드 아웃) ───────────────────────
-        elif self._pattern == PAT_TELE_OUT:
-            self._alpha = max(0, int(255 * (self._pat_timer / 35)))
-            if self._pat_timer <= 0:
-                # 플레이어 근처 빈 곳에 재등장
-                angle      = random.uniform(0, math.pi * 2)
-                dist_tele  = random.randint(100, 180)
-                self.x     = px + math.cos(angle) * dist_tele
-                self.y     = py + math.sin(angle) * dist_tele
-                self._tele_target = (px, py)
-                self._pattern   = PAT_TELE_IN
-                self._pat_timer = 30
-
-        # ── TELE_IN (페이드 인 + 즉시 버스트) ───────────
-        elif self._pattern == PAT_TELE_IN:
-            self._alpha = min(255, int(255 * (1.0 - self._pat_timer / 30)))
-            if self._pat_timer == 15:
-                # 재등장 순간 전방위 버스트
-                bullets += self._burst(12, speed=4.0, damage=10,
-                                       color=(200, 80, 255))
-            if self._pat_timer <= 0:
-                self._alpha   = 255
-                self._pattern = PAT_WANDER
-                self._pat_timer = random.randint(60, 90)
-
         # 애니메이션
         self._anim.update()
         return bullets
@@ -511,7 +485,7 @@ class Boss:
             screen.blit(glow, (sx - glow_r - 2, sy - glow_r - 2))
 
         # ── TELEPORT 알파 적용 ──
-        use_alpha = self._alpha if self._pattern in (PAT_TELE_OUT, PAT_TELE_IN) else 255
+        use_alpha = 255
 
         # ── 스프라이트 가져오기 ──
         img = self._anim.get_image().copy()
@@ -593,8 +567,6 @@ class Boss:
             PAT_CROSS_1:  "✦ CROSS",
             PAT_CROSS_2:  "✦ CROSS",
             PAT_SPIRAL:   "↻ SPIRAL",
-            PAT_TELE_OUT: "~ TELEPORT ~",
-            PAT_TELE_IN:  "~ TELEPORT ~",
         }
         ph_col = (160, 80, 255) if self.phase == 1 else (255, 60, 60)
         pt_txt = f"Phase {self.phase}  {pat_names.get(self._pattern,'')}"

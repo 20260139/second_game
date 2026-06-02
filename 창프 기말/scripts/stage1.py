@@ -128,9 +128,10 @@ class Room:
         self.is_boss   = is_boss
 
         # cleared: 적 전멸 여부  /  locked: 현재 문이 닫혀 있는 상태
-        self.cleared   = is_start   # 시작방은 시작부터 클리어
-        self.locked    = False      # 어떤 방도 처음엔 열려 있음
-        self.activated = is_start   # 한 번이라도 입장했는지 (어그로 트리거)
+        self.cleared      = is_start
+        self.locked       = False
+        self.activated    = is_start
+        self.reward_given = is_start   # 시작방은 보상 없음
 
         px, py = _room_pixel(grid_x, grid_y)
         self.px = px
@@ -159,6 +160,10 @@ class Stage1:
     def __init__(self, player, stage_num=1):
         self.player    = player
         self.stage_num = stage_num
+        self._dice_roll   = {}      # 현재 팝업 주사위 결과
+        self._dice_rolling= {}      # 굴림 애니 잔여 틱
+        self._dice_show   = {}      # 굴림 중 임시 값
+        self._dice_rects  = {}      # 주사위 클릭 영역
         self.bullets       = []
         self.e_bullets     = []
         self.slash_effects = []   # 참격 SlashWave 투사체
@@ -394,23 +399,16 @@ class Stage1:
 
     # ── 이벤트 ───────────────────────────────────────────
 
-    def handle_event(self, event, gm):
-        p = self.player
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            cam_x, cam_y = self._get_cam()
-            # 캔버스 좌표 -> 뷰포트 좌표로 변환해야 올바른 조준 각도 계산
-            vp_pos = self._canvas_to_vp(event.pos)
-            b = p.try_shoot(vp_pos, cam_x, cam_y)
-            if b:
-                from scripts.bullet import SlashWave
-                if isinstance(b, SlashWave):
-                    self.slash_effects.append(b)
-                else:
-                    self.bullets.append(b)
-
     # ── 업데이트 ─────────────────────────────────────────
 
     def update(self, keys, mouse_pos, gm):
+        # 방 클리어 보상 팝업 트리거
+        if getattr(gm, 'pending_room_clear', False):
+            gm.pending_room_clear = False
+            self._start_dice()
+            gm.state = "ROOM_CLEAR"
+            return
+
         self._tick += 1
         p     = self.player
         walls = self._current_walls()
@@ -606,12 +604,15 @@ class Stage1:
             if room.cleared or not room.activated:
                 continue
             enemies_dead = len(self._enemies_in_room(room.room_idx)) == 0
-            # 보스방은 보스까지 처치해야 클리어
             if room.is_boss:
                 boss_dead = (self.boss is None or self.boss.is_dead())
                 if enemies_dead and boss_dead:
                     room.cleared = True
                     room.locked  = False
+                    if not hasattr(self, '_clear_triggered'):
+                        self._clear_triggered = True
+                        self._start_dice()
+                        gm.state = "ROOM_CLEAR"   # 보스방 클리어 → 주사위 보상
             else:
                 if enemies_dead:
                     room.cleared = True
@@ -623,11 +624,6 @@ class Stage1:
             if c.alive and math.hypot(p.x-c.x, p.y-c.y) < p.radius+12:
                 gm.coins += c.value; c.alive = False
         self.coins = [c for c in self.coins if c.alive]
-
-        # ── 출구 판정 ────────────────────────────────────
-        boss = next(r for r in self.rooms if r.is_boss)
-        if boss.cleared and p.get_rect().colliderect(self.exit_rect):
-            gm.state = "CLEAR"
 
         if p.is_dead():
             gm.state = "GAMEOVER"
@@ -874,3 +870,197 @@ class Stage1:
         p_rx = px + 6 + (cur.grid_x - min_gx) * (mm_cell + mm_pad) + mm_cell//2
         p_ry = py + 6 + (cur.grid_y - min_gy) * (mm_cell + mm_pad) + mm_cell//2
         pygame.draw.circle(screen, (255, 255, 255), (p_rx, p_ry), 2)
+    # ── 인게임 주사위 팝업 ────────────────────────────────
+
+    # 스탯 정의 (key, 이름, 배율, 포맷, 색)
+    _SDEFS = [
+        ("hp",  "HP",   10,   "+{v} HP",     (220, 80,  80)),
+        ("spd", "SPD",  0.10, "+{v:.1f} SPD",(80, 220, 100)),
+        ("atk", "ATK",  3,    "+{v} ATK",    (255,200,  60)),
+        ("cd",  "CD",   2,    "-{v} tick",   ( 80,160, 255)),
+    ]
+    _ROLL_TICKS = 18
+
+    def _start_dice(self):
+        """새 주사위 롤 시작 (애니메이션 포함)."""
+        import random as _r
+        for key,*_ in self._SDEFS:
+            self._dice_roll[key]    = _r.randint(1, 6)
+            self._dice_rolling[key] = self._ROLL_TICKS
+            self._dice_show[key]    = _r.randint(1, 6)
+
+    def _apply_dice(self, player):
+        """현재 주사위 결과를 플레이어에 즉시 적용."""
+        for key, _, scale, *_ in self._SDEFS:
+            v = self._dice_roll.get(key, 1)
+            if key == "hp":
+                player.max_hp += v * int(scale)
+                player.hp      = min(player.hp + v * int(scale), player.max_hp)
+            elif key == "spd":
+                player.speed = round(player.speed + v * scale, 3)
+            elif key == "atk":
+                player.damage += v * int(scale)
+            elif key == "cd":
+                player.fire_rate = max(8, player.fire_rate - v * int(scale))
+
+    def _dice_face_surf(self, size, value, color, rolling=False):
+        import pygame as _pg
+        surf = _pg.Surface((size, size), _pg.SRCALPHA)
+        bc   = (255, 255, 180) if rolling else color
+        _pg.draw.rect(surf, (30,22,50), (0,0,size,size), border_radius=8)
+        _pg.draw.rect(surf, bc,         (0,0,size,size), 3 if rolling else 2, border_radius=8)
+        dot_r = max(3, size//10); pad = size//5
+        cx, cy = size//2, size//2
+        pts = {
+            1:[(cx,cy)],
+            2:[(pad,pad),(size-pad,size-pad)],
+            3:[(pad,pad),(cx,cy),(size-pad,size-pad)],
+            4:[(pad,pad),(size-pad,pad),(pad,size-pad),(size-pad,size-pad)],
+            5:[(pad,pad),(size-pad,pad),(cx,cy),(pad,size-pad),(size-pad,size-pad)],
+            6:[(pad,pad),(size-pad,pad),(pad,cy),(size-pad,cy),(pad,size-pad),(size-pad,size-pad)],
+        }
+        dc = (255,255,180) if rolling else color
+        for px,py in pts.get(max(1,min(6,value)),[]):
+            _pg.draw.circle(surf, dc, (px,py), dot_r)
+        return surf
+
+    def handle_event(self, event, gm):
+        import random as _r
+        import pygame as _pg
+
+        # ── ROOM_CLEAR 팝업 이벤트 ──────────────────────
+        if gm.state == "ROOM_CLEAR":
+            # 주사위 굴림 애니메이션 업데이트
+            for key in list(self._dice_rolling):
+                if self._dice_rolling[key] > 0:
+                    self._dice_rolling[key] -= 1
+                    self._dice_show[key] = _r.randint(1, 6)
+
+            if event.type == _pg.MOUSEBUTTONDOWN and event.button == 1:
+                # 개별 주사위 클릭 → 해당 주사위 재롤 (티켓 소모)
+                for key, dr in self._dice_rects.items():
+                    if dr.collidepoint(event.pos):
+                        if gm.reroll_tickets > 0:
+                            gm.reroll_tickets -= 1
+                            self._dice_roll[key]    = _r.randint(1, 6)
+                            self._dice_rolling[key] = self._ROLL_TICKS
+                            self._dice_show[key]    = _r.randint(1, 6)
+                        return
+
+                # CONFIRM 버튼
+                if hasattr(self, '_confirm_rect') and self._confirm_rect.collidepoint(event.pos):
+                    for key in self._dice_rolling:
+                        self._dice_rolling[key] = 0
+                    self._apply_dice(self.player)
+                    gm.state = "CLEAR"   # 보너스 확정 → 스테이지 클리어
+                    return
+
+                # REROLL ALL 버튼
+                if hasattr(self, '_reroll_rect') and self._reroll_rect.collidepoint(event.pos):
+                    if gm.reroll_tickets > 0:
+                        gm.reroll_tickets -= 1
+                        self._start_dice()
+                    return
+            return
+
+        # ── 일반 스테이지 이벤트 ────────────────────────
+        if event.type == _pg.MOUSEBUTTONDOWN and event.button == 1:
+            cam_x, cam_y = self._get_cam()
+            vp_pos = self._canvas_to_vp(event.pos)
+            b = self.player.try_shoot(vp_pos, cam_x, cam_y)
+            if b:
+                if hasattr(b, '_angle'):
+                    self.slash_effects.append(b)
+                else:
+                    self.bullets.append(b)
+
+    def draw_dice_popup(self, screen, gm):
+        """방 클리어 후 주사위 보상 팝업 (canvas 위에 직접 그림)."""
+        import pygame as _pg
+        import random as _r
+
+        sw, sh = screen.get_size()
+
+        # 배경 오버레이
+        overlay = _pg.Surface((sw, sh), _pg.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        screen.blit(overlay, (0, 0))
+
+        # 팝업 패널
+        pw, ph2 = 420, 360
+        px2 = sw//2 - pw//2
+        py2 = sh//2 - ph2//2
+        panel = _pg.Surface((pw, ph2), _pg.SRCALPHA)
+        _pg.draw.rect(panel, (18, 14, 35, 240), (0,0,pw,ph2), border_radius=14)
+        _pg.draw.rect(panel, (100, 70, 180, 220), (0,0,pw,ph2), 2, border_radius=14)
+        screen.blit(panel, (px2, py2))
+
+        # 제목
+        font_t = _pg.font.SysFont(None, 36)
+        t = font_t.render("ROOM  CLEAR  —  BONUS!", True, (255, 210, 60))
+        screen.blit(t, (sw//2 - t.get_width()//2, py2 + 14))
+
+        # 티켓 수
+        font_tk = _pg.font.SysFont(None, 22)
+        tkt = font_tk.render(f"Tickets: {gm.reroll_tickets}  (click die to reroll -1)", True, (180, 160, 220))
+        screen.blit(tkt, (sw//2 - tkt.get_width()//2, py2 + 46))
+
+        # 주사위 4개
+        dice_size = 52
+        row_h     = 64
+        dy0       = py2 + 76
+        font_dl   = _pg.font.SysFont(None, 22)
+        self._dice_rects = {}
+
+        for i, (key, name, scale, fmt, col) in enumerate(self._SDEFS):
+            row_y   = dy0 + i * row_h
+            rolling = self._dice_rolling.get(key, 0) > 0
+            dv      = self._dice_show.get(key, 1) if rolling else self._dice_roll.get(key, 1)
+
+            # 이름
+            lt = font_dl.render(name, True, col)
+            screen.blit(lt, (px2 + 18, row_y + (dice_size - lt.get_height())//2))
+
+            # 주사위
+            dx = px2 + 72
+            hovered = (_pg.Rect(dx, row_y, dice_size, dice_size).collidepoint(_pg.mouse.get_pos())
+                       and gm.reroll_tickets > 0 and not rolling)
+            dsurf = self._dice_face_surf(dice_size, dv, col, rolling=rolling or hovered)
+            screen.blit(dsurf, (dx, row_y))
+            self._dice_rects[key] = _pg.Rect(dx, row_y, dice_size, dice_size)
+
+            # 클릭 힌트
+            if hovered:
+                ht2 = _pg.font.SysFont(None, 17).render("click!", True, (255,255,180))
+                screen.blit(ht2, (dx, row_y - 13))
+
+            # 보너스 수치
+            actual = dv * scale
+            if key in ("hp","atk","cd"): bonus_str = fmt.format(v=int(actual))
+            else:                         bonus_str = fmt.format(v=actual)
+            bt = font_dl.render(bonus_str, True, (200,200,200) if rolling else col)
+            screen.blit(bt, (dx + dice_size + 14, row_y + (dice_size - bt.get_height())//2))
+
+        # REROLL ALL 버튼
+        rw, rh = 150, 34
+        rx2 = sw//2 - rw - 8
+        ry2 = py2 + ph2 - 52
+        self._reroll_rect = _pg.Rect(rx2, ry2, rw, rh)
+        rc = (80,50,20) if gm.reroll_tickets > 0 else (40,35,30)
+        _pg.draw.rect(screen, rc, self._reroll_rect, border_radius=6)
+        _pg.draw.rect(screen, (160,100,40), self._reroll_rect, 2, border_radius=6)
+        rt2 = font_dl.render(f"REROLL ALL (1 ticket)", True, (230,180,80) if gm.reroll_tickets>0 else (100,90,70))
+        screen.blit(rt2, (self._reroll_rect.centerx - rt2.get_width()//2,
+                          self._reroll_rect.centery - rt2.get_height()//2))
+
+        # CONFIRM 버튼
+        cw, ch = 150, 34
+        cx3 = sw//2 + 8
+        cy3 = ry2
+        self._confirm_rect = _pg.Rect(cx3, cy3, cw, ch)
+        cc = (40,120,60) if not any(v>0 for v in self._dice_rolling.values()) else (30,60,40)
+        _pg.draw.rect(screen, cc, self._confirm_rect, border_radius=6)
+        _pg.draw.rect(screen, (80,200,100), self._confirm_rect, 2, border_radius=6)
+        ct2 = font_dl.render("TAKE BONUS", True, (180,255,180))
+        screen.blit(ct2, (self._confirm_rect.centerx - ct2.get_width()//2,
+                          self._confirm_rect.centery - ct2.get_height()//2))

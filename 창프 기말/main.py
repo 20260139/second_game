@@ -94,14 +94,12 @@ def draw_clear(gm):
     screen.fill((5, 15, 10))
     font1 = scaled_font(80)
     font2 = scaled_font(34)
-    font3 = scaled_font(26)
-    prev_stage = gm.stage - 1   # stage1.py에서 이미 +1 됐으므로
-    t1 = font1.render(f"FLOOR {prev_stage}  CLEAR!", True, (100, 255, 160))
+    t1 = font1.render("STAGE  CLEAR!", True, (100, 255, 160))
     t2 = font2.render(f"Score: {gm.score}    Coins: {gm.coins}", True, (200, 240, 210))
-    t3 = font3.render(f"Next: Floor {gm.stage}  ─  Press  R  to enter", True, (140, 220, 180))
-    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh * 0.28)))
-    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh * 0.48)))
-    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.60)))
+    t3 = font2.render("Press  R  to return to Lobby", True, (140, 180, 150))
+    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh * 0.33)))
+    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh * 0.52)))
+    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.62)))
 
 
 def draw_final_clear(gm):
@@ -141,10 +139,7 @@ while running:
                 toggle_fullscreen()
 
             if event.key == pygame.K_ESCAPE:
-                if gm.state == "STAGE1":
-                    gm.state = "LOBBY"
-                elif gm.state == "LOBBY":
-                    running = False   # 로비에서 ESC → 종료
+                running = False   # ESC → 즉시 종료
 
             if event.key == pygame.K_r:
                 if gm.state == "GAMEOVER":
@@ -156,7 +151,10 @@ while running:
                         gm.state = "FINAL_CLEAR"
                     else:
                         gm.stage += 1
-                        lobby.on_enter_lobby()
+                        # 스탯 유지 — 주사위 롤만 새로 (초기화 없음)
+                        lobby._new_roll()
+                        lobby._start_rolling_anim()
+                        lobby._roll_generated = True
                         gm.state = "LOBBY"
                 elif gm.state == "FINAL_CLEAR":
                     lobby.on_enter_lobby()
@@ -180,7 +178,7 @@ while running:
             if gm.state == "STAGE1":
                 new_stage()
 
-        elif gm.state == "STAGE1" and stage1:
+        elif gm.state in ("STAGE1", "ROOM_CLEAR") and stage1:
             stage1.handle_event(event, gm)
 
     # ── 업데이트 & 그리기 ─────────────────────────────────
@@ -194,12 +192,15 @@ while running:
         lobby.update(keys)
         lobby.draw(canvas, gm)
 
-    elif gm.state == "STAGE1" and stage1:
-        stage1.update(keys, mouse_pos, gm)
+    elif gm.state in ("STAGE1", "ROOM_CLEAR") and stage1:
+        if gm.state == "STAGE1":
+            stage1.update(keys, mouse_pos, gm)
         stage1.draw(canvas, gm)
+        if gm.state == "ROOM_CLEAR":
+            stage1.draw_dice_popup(canvas, gm)
 
     # ── canvas → screen 스케일링 (최근접 보간으로 픽셀 유지) ─
-    if gm.state in ("LOBBY", "STAGE1"):
+    if gm.state in ("LOBBY", "STAGE1", "ROOM_CLEAR"):
         if scale == 1.0 and ox == 0 and oy == 0:
             screen.blit(canvas, (0, 0))
         else:
