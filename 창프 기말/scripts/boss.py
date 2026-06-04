@@ -283,15 +283,19 @@ class Boss:
         b.color = col
         return b
 
-    def _burst(self, n, base_angle=None, speed=4.5, damage=None, offset=0.0):
+    def _burst(self, n, base_angle=None, speed=4.5, damage=None, offset=0.0, color=None):
         """n방향 방사. base_angle=None 이면 균등 분배(전방위)."""
         bullets = []
         if base_angle is None:
             for i in range(n):
-                bullets.append(self._bullet(2*math.pi/n*i + offset, speed, damage))
+                b = self._bullet(2*math.pi/n*i + offset, speed, damage)
+                if color: b.color = color
+                bullets.append(b)
         else:
             for i in range(n):
-                bullets.append(self._bullet(base_angle + (2*math.pi/n)*i + offset, speed, damage))
+                b = self._bullet(base_angle + (2*math.pi/n)*i + offset, speed, damage)
+                if color: b.color = color
+                bullets.append(b)
         return bullets
 
     # ── 패턴 선택 ────────────────────────────────────────

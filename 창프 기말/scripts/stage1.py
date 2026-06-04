@@ -187,14 +187,17 @@ class Stage1:
         if start_room:
             self._visited_rooms.add(start_room.room_idx)
 
-        # 스테이지 난이도 스케일링
-        hp_mult  = 1.0 + (self.stage_num - 1) * 0.4
-        spd_mult = 1.0 + (self.stage_num - 1) * 0.12
+        # 스테이지 난이도 스케일링 (스탯 배율)
+        # 층마다 HP +50%, 속도 +15%, 데미지 +20% 복리 증가
+        n = self.stage_num - 1
+        hp_mult  = 1.0 + n * 0.50
+        spd_mult = 1.0 + n * 0.15
+        dmg_mult = 1.0 + n * 0.20
         for e in self.enemies:
             e.max_hp = int(e.max_hp * hp_mult)
             e.hp     = e.max_hp
             e.speed  = round(e.speed * spd_mult, 2)
-        # 보스 HP 스케일링 (Boss 고유 MAX_HP × 스테이지 배율)
+            e.damage = int(e.damage * dmg_mult)
         if self.boss:
             self.boss.hp = self.boss.MAX_HP
 

@@ -155,6 +155,78 @@ class Enemy:
             "n_frames" : 4,
             "anim_spd" : 10,
         },
+            "goblin": {
+                "frames_fn": enemy_sprites._get_goblin_walk,
+                "n_frames" : 4,
+                "hp"       : 55,
+                "speed"    : 2.4,
+                "damage"   : 9,
+                "radius"   : 10,
+                "color"    : (50, 160, 50),
+                "outline"  : (20, 90, 20),
+                "anim_spd" : 5,
+                "shoot_cd" : None,
+            },
+            "skeleton": {
+                "frames_fn": enemy_sprites._get_skeleton_walk,
+                "n_frames" : 4,
+                "hp"       : 90,
+                "speed"    : 1.4,
+                "damage"   : 13,
+                "radius"   : 11,
+                "color"    : (220, 220, 210),
+                "outline"  : (150, 150, 140),
+                "anim_spd" : 7,
+                "shoot_cd" : None,
+            },
+            "dknight": {
+                "frames_fn": enemy_sprites._get_dknight_walk,
+                "n_frames" : 4,
+                "hp"       : 150,
+                "speed"    : 1.0,
+                "damage"   : 18,
+                "radius"   : 13,
+                "color"    : (35, 25, 60),
+                "outline"  : (80, 60, 130),
+                "anim_spd" : 8,
+                "shoot_cd" : None,
+            },
+            "demon": {
+                "frames_fn": enemy_sprites._get_demon_walk,
+                "n_frames" : 4,
+                "hp"       : 110,
+                "speed"    : 2.0,
+                "damage"   : 16,
+                "radius"   : 12,
+                "color"    : (140, 15, 15),
+                "outline"  : (220, 50, 50),
+                "anim_spd" : 5,
+                "shoot_cd" : 70,
+            },
+            "orc": {
+                "frames_fn": enemy_sprites._get_orc_walk,
+                "n_frames" : 4,
+                "hp"       : 120,
+                "speed"    : 1.3,
+                "damage"   : 14,
+                "radius"   : 13,
+                "color"    : (60, 100, 40),
+                "outline"  : (30, 70, 20),
+                "anim_spd" : 7,
+                "shoot_cd" : None,
+            },
+            "vampire": {
+                "frames_fn": enemy_sprites._get_vampire_walk,
+                "n_frames" : 4,
+                "hp"       : 75,
+                "speed"    : 2.6,
+                "damage"   : 12,
+                "radius"   : 11,
+                "color"    : (100, 0, 0),
+                "outline"  : (180, 20, 20),
+                "anim_spd" : 5,
+                "shoot_cd" : 55,
+            },
     }
 
     _frame_cache = {}
@@ -204,8 +276,9 @@ class Enemy:
             return
         key = self.kind
         if key not in Enemy._frame_cache:
+            frames = self._cfg.get("frames") or self._cfg["frames_fn"]()
             Enemy._frame_cache[key] = _load_enemy_frames(
-                self._cfg["frames"], self._cfg["n_frames"]
+                frames, self._cfg["n_frames"]
             )
         self._anim = Animation(
             Enemy._frame_cache[key],
@@ -424,12 +497,11 @@ class Enemy:
         sy = int(self.y) - cam_y
 
         if self._anim:
-            img = self._anim.get_image()
+            img = self._anim.get_image().copy()
 
+            # 피격 깜빡임: RGB만 밝게 올려 투명 영역(알파) 유지 → 흰 박스 없음
             if self._hit_timer > 0 and (self._hit_timer // 3) % 2 == 0:
-                img2 = self._anim.get_image().copy()
-                img2.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_ADD)
-                img = img2
+                img.fill((200, 200, 200), special_flags=pygame.BLEND_RGB_ADD)
 
             if self.flip:
                 img = pygame.transform.flip(img, True, False)
@@ -437,11 +509,6 @@ class Enemy:
             draw_x = sx - DRAW_SIZE // 2
             draw_y = sy - DRAW_SIZE // 2
             screen.blit(img, (draw_x, draw_y))
-
-            if self._hit_timer > 0 and (self._hit_timer // 3) % 2 == 0:
-                flash = pygame.Surface((DRAW_SIZE, DRAW_SIZE), pygame.SRCALPHA)
-                flash.fill((255, 255, 255, 120))
-                screen.blit(flash, (draw_x, draw_y))
         else:
             if self._hit_timer > 0 and (self._hit_timer // 3) % 2 == 0:
                 draw_color = (255, 255, 255)
