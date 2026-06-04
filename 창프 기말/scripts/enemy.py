@@ -1,7 +1,6 @@
 # scripts/enemy.py
 
-import pygame, math, random, base64, heapq
-from io import BytesIO
+import pygame, math, random, heapq
 from scripts.bullet import EnemyBullet
 from scripts import enemy_sprites
 from scripts.animation import Animation
@@ -10,17 +9,12 @@ CELL_E    = 32   # 적 스프라이트 셀 크기
 DRAW_SIZE = 36   # 렌더 크기
 TILE      = 32   # 탐색 그리드 단위
 
-def _load_enemy_frames(b64_data, n_frames):
-    raw   = base64.b64decode(b64_data)
-    sheet = pygame.image.load(BytesIO(raw)).convert_alpha()
-    frames = []
-    for i in range(n_frames):
-        rect  = pygame.Rect(i * CELL_E, 0, CELL_E, CELL_E)
-        frame = pygame.transform.scale(
-            sheet.subsurface(rect).copy(), (DRAW_SIZE, DRAW_SIZE)
-        )
-        frames.append(frame)
-    return frames
+def _load_enemy_frames(frames_list, n_frames):
+    """enemy_sprites 에서 가져온 프레임 리스트를 DRAW_SIZE 로 스케일링."""
+    return [
+        pygame.transform.scale(f.copy(), (DRAW_SIZE, DRAW_SIZE))
+        for f in frames_list[:n_frames]
+    ]
 
 
 # ── A* 경로 탐색 ─────────────────────────────────────────────
@@ -127,7 +121,7 @@ class Enemy:
             "atk_cd"   : 60,
             "shoot"    : False,
             "score"    : 10,
-            "b64"      : "SLIME_WALK",
+            "frames"   : enemy_sprites.SLIME_WALK,
             "n_frames" : 4,
             "anim_spd" : 8,
         },
@@ -142,7 +136,7 @@ class Enemy:
             "atk_cd"   : 45,
             "shoot"    : False,
             "score"    : 15,
-            "b64"      : "BAT_WALK",
+            "frames"   : enemy_sprites.BAT_WALK,
             "n_frames" : 4,
             "anim_spd" : 5,
         },
@@ -157,7 +151,7 @@ class Enemy:
             "atk_cd"   : 90,
             "shoot"    : True,
             "score"    : 25,
-            "b64"      : "ARCHER_WALK",
+            "frames"   : enemy_sprites.ARCHER_WALK,
             "n_frames" : 4,
             "anim_spd" : 10,
         },
@@ -210,9 +204,8 @@ class Enemy:
             return
         key = self.kind
         if key not in Enemy._frame_cache:
-            b64_data = getattr(enemy_sprites, self._cfg["b64"])
             Enemy._frame_cache[key] = _load_enemy_frames(
-                b64_data, self._cfg["n_frames"]
+                self._cfg["frames"], self._cfg["n_frames"]
             )
         self._anim = Animation(
             Enemy._frame_cache[key],

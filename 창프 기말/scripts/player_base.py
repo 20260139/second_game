@@ -3,9 +3,12 @@
 # base64 없이 pygame.image.load + subsurface 방식 사용
 
 import pygame
+import sys, os
+sys.path.insert(0, '.')
+from scripts.resource_path import resource_path
 
 # ── 시트 로드 ──
-player_sheet = pygame.image.load("./asset/Player/player.png")
+player_sheet = pygame.image.load(resource_path("asset/Player/player.png"))
 
 FRAME_W, FRAME_H = 64, 64
 COLS = 14

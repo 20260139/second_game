@@ -781,21 +781,30 @@ class Boss2(Boss):
         if self._pattern == B2_STOMP and self._stomp_warned:
             warn_r = 60 + int(abs(math.sin(self._wobble*3))*10)
             ws = pygame.Surface((warn_r*2, warn_r*2), pygame.SRCALPHA)
-            pygame.draw.circle(ws, (255,120,0,50),(warn_r,warn_r),warn_r)
-            pygame.draw.circle(ws, (255,180,0,120),(warn_r,warn_r),warn_r,2)
+            pygame.draw.circle(ws, (255,120,0),(warn_r,warn_r),warn_r)
+            ws.set_alpha(50)
             screen.blit(ws,(sx-warn_r, sy-warn_r))
+            ws2 = pygame.Surface((warn_r*2, warn_r*2), pygame.SRCALPHA)
+            pygame.draw.circle(ws2, (255,180,0),(warn_r,warn_r),warn_r,2)
+            ws2.set_alpha(120)
+            screen.blit(ws2,(sx-warn_r, sy-warn_r))
         # 실드 오라
         if self._shield_on:
             pulse = int(abs(math.sin(self._wobble*2))*30)
             sa = pygame.Surface((80,80), pygame.SRCALPHA)
-            pygame.draw.circle(sa,(100,200,255,80+pulse),(40,40),36)
-            pygame.draw.circle(sa,(180,240,255,200),(40,40),36,3)
+            pygame.draw.circle(sa,(100,200,255),(40,40),36)
+            sa.set_alpha(80+pulse)
             screen.blit(sa,(sx-40,sy-40))
+            sa2 = pygame.Surface((80,80), pygame.SRCALPHA)
+            pygame.draw.circle(sa2,(180,240,255),(40,40),36,3)
+            sa2.set_alpha(200)
+            screen.blit(sa2,(sx-40,sy-40))
         # SLAM 전조 glow
         if self._pattern == B2_SLAM_W:
             gw = pygame.Surface((100,100),pygame.SRCALPHA)
             a  = int((self._scale-1.0)/0.3*180)
-            pygame.draw.circle(gw,(255,80,0,a),(50,50),44)
+            pygame.draw.circle(gw,(255,80,0),(50,50),44)
+            gw.set_alpha(a)
             screen.blit(gw,(sx-50,sy-50))
         img = self._anim.get_image().copy()
         if self._hit_timer > 0 and (self._hit_timer//3)%2==0:
@@ -1002,7 +1011,8 @@ class Boss3(Boss):
         # 상시 마법 오라
         pulse=int(abs(math.sin(self._wobble))*25)
         ao=pygame.Surface((80,80),pygame.SRCALPHA)
-        pygame.draw.circle(ao,(120,0,220,30+pulse),(40,40),34)
+        pygame.draw.circle(ao,(120,0,220),(40,40),34)
+        ao.set_alpha(30+pulse)
         screen.blit(ao,(sx-40,sy-40))
         img=self._anim.get_image().copy()
         if self._hit_timer>0 and (self._hit_timer//3)%2==0:
@@ -1202,16 +1212,21 @@ class Boss4(Boss):
         # 전기 오라
         pulse=int(abs(math.sin(self._wobble*2))*25)
         ea=pygame.Surface((90,90),pygame.SRCALPHA)
-        pygame.draw.circle(ea,(60,160,255,30+pulse),(45,45),38)
+        pygame.draw.circle(ea,(60,160,255),(45,45),38)
+        ea.set_alpha(30+pulse)
         screen.blit(ea,(sx-45,sy-45))
         # 낙뢰 예고원
         for tx,ty in self._lightning_targets:
             tsx,tsy=tx-cam_x,ty-cam_y
             ws=pygame.Surface((60,60),pygame.SRCALPHA)
             a=int(abs(math.sin(self._wobble*4))*150)+50
-            pygame.draw.circle(ws,(255,255,100,a),(30,30),28)
-            pygame.draw.circle(ws,(255,255,180,200),(30,30),28,2)
+            pygame.draw.circle(ws,(255,255,100),(30,30),28)
+            ws.set_alpha(a)
             screen.blit(ws,(tsx-30,tsy-30))
+            ws2=pygame.Surface((60,60),pygame.SRCALPHA)
+            pygame.draw.circle(ws2,(255,255,180),(30,30),28,2)
+            ws2.set_alpha(200)
+            screen.blit(ws2,(tsx-30,tsy-30))
         img=self._anim.get_image().copy()
         if self._hit_timer>0 and (self._hit_timer//3)%2==0:
             fl=pygame.Surface((80,80),pygame.SRCALPHA); fl.fill((255,255,255,160)); img.blit(fl,(0,0))
@@ -1444,7 +1459,8 @@ class Boss5(Boss):
         ac=aura_cols[ph-1]
         pulse=int(abs(math.sin(self._wobble))*20)
         ao=pygame.Surface((100,100),pygame.SRCALPHA)
-        pygame.draw.circle(ao,(*ac[:3],ac[3]+pulse),(50,50),42)
+        pygame.draw.circle(ao,ac[:3],(50,50),42)
+        ao.set_alpha(ac[3]+pulse)
         screen.blit(ao,(sx-50,sy-50))
         img=self._anim.get_image().copy()
         if self._hit_timer>0 and (self._hit_timer//3)%2==0:
