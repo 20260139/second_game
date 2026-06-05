@@ -98,6 +98,36 @@ def _check_los(ax, ay, bx, by, wall_set):
 #  스프라이트 (절차적 4프레임)
 # ══════════════════════════════════════════════════════════
 
+def _load_boss1_sheets(size=128):
+    """boss1_sheet.png (3x3 그리드) 로드.
+    반환: (idle_frames, attack_frames, walk_frames) 각 3프레임.
+    실패 시 (fallback, fallback, fallback) 반환."""
+    import sys; sys.path.insert(0,'.')
+    try:
+        from scripts.resource_path import resource_path
+        path = resource_path("asset/Boss/boss1_sheet.png")
+    except Exception:
+        path = "./asset/Boss/boss1_sheet.png"
+    try:
+        sheet = pygame.image.load(path).convert_alpha()
+        cell  = sheet.get_width() // 3
+        rows  = []
+        for row in range(3):
+            row_frames = []
+            for col in range(3):
+                f = sheet.subsurface(
+                    pygame.Rect(col*cell, row*cell, cell, cell)
+                ).copy()
+                row_frames.append(pygame.transform.scale(f, (size, size)))
+            rows.append(row_frames)
+        # 0행=대기, 1행=공격, 2행=이동
+        return rows[0], rows[1], rows[2]
+    except Exception as e:
+        print(f"[Boss1] 스프라이트 로드 실패: {e}")
+        fb = _make_boss_frames(96)
+        return fb, fb, fb
+
+
 def _make_boss_frames(size=DRAW_SIZE):
     frames = []
     for fi in range(4):
@@ -180,7 +210,9 @@ class Boss:
     MAX_HP = 500
     RADIUS = 24
 
-    _frames_cache = None
+    _idle_cache   = None
+    _attack_cache = None
+    _walk_cache   = None
 
     def __init__(self, x, y):
         self.x      = float(x)
@@ -214,10 +246,13 @@ class Boss:
         self._wall_set_id = None
         self._has_los     = False
 
-        # 애니메이션
-        if Boss._frames_cache is None:
-            Boss._frames_cache = _make_boss_frames()
-        self._anim = Animation(Boss._frames_cache, 8, loop=True)
+        # 애니메이션 (대기/공격/이동 3세트)
+        if Boss._idle_cache is None:
+            Boss._idle_cache, Boss._attack_cache, Boss._walk_cache = _load_boss1_sheets()
+        self._anim_idle   = Animation(Boss._idle_cache,   10, loop=True)
+        self._anim_attack = Animation(Boss._attack_cache,  6, loop=False)
+        self._anim_walk   = Animation(Boss._walk_cache,    8, loop=True)
+        self._anim        = self._anim_idle   # 현재 재생 중인 애니메이션
 
     # ── 경로 탐색 ────────────────────────────────────────
 
@@ -439,8 +474,24 @@ class Boss:
                 self._pattern   = PAT_WANDER
                 self._pat_timer = random.randint(50, 90)
 
-        # 애니메이션
+        # 패턴에 따라 애니메이션 전환
+        if self._pattern in (PAT_CHARGE_W, PAT_CHARGE_R, PAT_SPIRAL, PAT_CROSS_1):
+            if self._anim is not self._anim_attack:
+                self._anim_attack.reset()
+                self._anim = self._anim_attack
+        elif self._pattern == PAT_WANDER:
+            if self._anim is not self._anim_walk:
+                self._anim = self._anim_walk
+        else:
+            if self._anim is not self._anim_idle:
+                self._anim = self._anim_idle
+
         self._anim.update()
+
+        # 공격 애니메이션 1회 재생 후 idle로 복귀
+        if self._anim is self._anim_attack and self._anim_attack.done:
+            self._anim_attack.reset()
+            self._anim = self._anim_idle
         return bullets
 
     # ── 피격 ─────────────────────────────────────────────
@@ -491,29 +542,29 @@ class Boss:
         # ── TELEPORT 알파 적용 ──
         use_alpha = 255
 
-        # ── 스프라이트 가져오기 ──
+        # ── 스프라이트 그리기 ──
         img = self._anim.get_image().copy()
 
-        # 피격 플래시
+        # 피격 플래시 (BLEND_RGB_ADD — 투명 영역 보호)
         if self._hit_timer > 0 and (self._hit_timer // 3) % 2 == 0:
-            flash = pygame.Surface((DRAW_SIZE, DRAW_SIZE), pygame.SRCALPHA)
-            flash.fill((255, 255, 255, 160))
-            img.blit(flash, (0, 0))
+            img.fill((200, 200, 200), special_flags=pygame.BLEND_RGB_ADD)
 
-        # 스케일 변환
+        # 크기 (기본 90px, CHARGE 시 스케일 적용)
+        BASE_SZ = 90
         if abs(self._scale - 1.0) > 0.02:
-            sz  = int(DRAW_SIZE * self._scale)
+            sz  = int(BASE_SZ * self._scale)
             img = pygame.transform.scale(img, (sz, sz))
         else:
-            sz  = DRAW_SIZE
+            sz  = BASE_SZ
+            if img.get_width() != sz:
+                img = pygame.transform.scale(img, (sz, sz))
 
-        # 좌우 반전
+        # 좌우 반전 (바라보는 방향)
         if self.flip:
             img = pygame.transform.flip(img, True, False)
 
-        # 알파 적용 (TELEPORT)
+        # 알파 적용
         if use_alpha < 255:
-            img = img.copy()
             img.set_alpha(use_alpha)
 
         screen.blit(img, (sx - sz//2, sy - sz//2))
@@ -774,6 +825,13 @@ class Boss2(Boss):
                 self._pat_timer = random.randint(70,100)
                 self._scale     = 1.0
 
+        # 패턴에 따라 애니메이션 전환
+        if self._pattern in (PAT_CHARGE_W, PAT_CHARGE_R, PAT_SPIRAL, PAT_CROSS_1):
+            self._anim = self._anim_attack
+        elif self._pattern == PAT_WANDER:
+            self._anim = self._anim_walk
+        else:
+            self._anim = self._anim_idle
         self._anim.update()
         return bullets
 
