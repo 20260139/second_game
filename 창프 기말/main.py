@@ -6,6 +6,8 @@ from scripts.game_manager import GameManager
 from scripts.player       import Player
 from scripts.lobby        import Lobby
 from scripts.stage1       import Stage1
+from scripts.settings     import Settings
+from scripts.sound_manager import SoundManager
 
 pygame.init()
 
@@ -68,6 +70,11 @@ gm     = GameManager()
 player = Player()
 lobby  = Lobby(player)
 stage1 = None   # 스테이지는 STAGE1 진입 시 생성
+
+
+settings = Settings()
+sm       = SoundManager()
+sm.play_bgm("asset/Sound/bgm_main.wav")
 
 
 def new_stage():
@@ -139,7 +146,21 @@ while running:
                 toggle_fullscreen()
 
             if event.key == pygame.K_ESCAPE:
-                running = False   # ESC → 즉시 종료
+                running = False
+
+            # ── 치트키 P: 공격력 +30, 최대HP +50 즉시 적용 ──
+            if event.key == pygame.K_p:
+                player.damage  += 30
+                player.max_hp  += 50
+                player.hp       = min(player.hp + 50, player.max_hp)
+
+            if event.key == pygame.K_g:
+                if settings.is_open:
+                    settings.close()
+                    gm.state = settings._prev_state or gm.state
+                else:
+                    settings.open(gm.state)
+                    gm.state = "SETTINGS"
 
             if event.key == pygame.K_r:
                 if gm.state == "GAMEOVER":
@@ -164,7 +185,14 @@ while running:
                     gm.reroll_tickets = 0
                     gm.state = "LOBBY"
 
-        # 마우스 이벤트의 pos를 캔버스 좌표로 변환
+        # 설정창이 열려 있으면 screen 좌표 그대로 전달 (canvas 변환 전)
+        if gm.state == "SETTINGS":
+            new_sc = settings.handle_event(event, gm, lobby, screen)
+            if new_sc is not None:
+                screen = new_sc
+            continue
+
+        # 마우스 이벤트의 pos를 캔버스 좌표로 변환 (설정창 제외)
         if event.type == pygame.MOUSEBUTTONDOWN:
             canvas_pos = screen_to_canvas(event.pos)
             event = pygame.event.Event(
@@ -200,7 +228,7 @@ while running:
             stage1.draw_dice_popup(canvas, gm)
 
     # ── canvas → screen 스케일링 (최근접 보간으로 픽셀 유지) ─
-    if gm.state in ("LOBBY", "STAGE1", "ROOM_CLEAR"):
+    if gm.state in ("LOBBY", "STAGE1", "ROOM_CLEAR", "SETTINGS"):
         if scale == 1.0 and ox == 0 and oy == 0:
             screen.blit(canvas, (0, 0))
         else:
@@ -220,6 +248,11 @@ while running:
 
     elif gm.state == "FINAL_CLEAR":
         draw_final_clear(gm)
+
+    if gm.state == "SETTINGS":
+        settings.draw(screen, gm)
+        sm.set_bgm_volume(settings.bgm_volume)
+        sm.set_sfx_volume(settings.sfx_volume)
 
     pygame.display.flip()
 
