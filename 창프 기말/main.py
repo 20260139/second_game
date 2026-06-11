@@ -2,6 +2,7 @@
 
 import pygame
 import sys
+import random as _rng
 from scripts.game_manager import GameManager
 from scripts.player       import Player
 from scripts.lobby        import Lobby
@@ -242,15 +243,25 @@ while running:
 
     # ── canvas → screen 스케일링 (최근접 보간으로 픽셀 유지) ─
     if gm.state in ("LOBBY", "STAGE1", "ROOM_CLEAR", "MERCHANT", "SETTINGS"):
+        # 피격 시 화면 흔들림
+        shake = getattr(player, 'screen_shake', 0)
+        if shake > 0:
+            intensity = min(shake, 8)          # 최대 8px
+            shk_x = _rng.randint(-intensity, intensity)
+            shk_y = _rng.randint(-intensity, intensity)
+        else:
+            shk_x = shk_y = 0
+
         if scale == 1.0 and ox == 0 and oy == 0:
-            screen.blit(canvas, (0, 0))
+            screen.fill((0, 0, 0))
+            screen.blit(canvas, (shk_x, shk_y))
         else:
             screen.fill((0, 0, 0))
             scaled = pygame.transform.scale(
                 canvas,
                 (int(BASE_W * scale), int(BASE_H * scale))
             )
-            screen.blit(scaled, (int(ox), int(oy)))
+            screen.blit(scaled, (int(ox) + shk_x, int(oy) + shk_y))
 
     # ── UI 텍스트는 screen에 직접 그려 선명하게 유지 ──────
     elif gm.state == "GAMEOVER":

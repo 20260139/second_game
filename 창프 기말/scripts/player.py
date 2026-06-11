@@ -41,6 +41,9 @@ class Player:
         self._atk_angle       = 0.0
         self._melee_triggered = False
 
+        # 피격 화면 흔들림 (main.py에서 읽음)
+        self.screen_shake = 0
+
         # 애니메이션을 __init__ 에서 즉시 로드(지연 로드 제거)
         self._anims_loaded = False
         self._anims = {}
@@ -163,6 +166,8 @@ class Player:
             self.fire_cd -= 1
         if self.hit_timer > 0:
             self.hit_timer -= 1
+        if self.screen_shake > 0:
+            self.screen_shake -= 1
 
         if self._cur_anim:
             self._cur_anim.update()
@@ -177,6 +182,7 @@ class Player:
             return False
         self.hp -= amount
         self.hit_timer = 60
+        self.screen_shake = 14   # 흔들림 지속 프레임
         self.state = "HIT"
         self._anims["HIT"].reset()
         self._cur_anim = self._anims["HIT"]
