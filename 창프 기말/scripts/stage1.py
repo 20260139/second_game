@@ -158,9 +158,11 @@ class Room:
 
 class Stage1:
 
-    def __init__(self, player, stage_num=1):
+    def __init__(self, player, stage_num=1, sm=None):
         self.player    = player
         self.stage_num = stage_num
+        self._sm = sm           # SoundManager (BGM 전환용)
+        self._boss_bgm_playing = False
         self.merchant = Merchant()
         self._dice_roll   = {}      # 현재 팝업 주사위 결과
         self._dice_rolling= {}      # 굴림 애니 잔여 틱
@@ -511,6 +513,9 @@ class Stage1:
                 # ── 보스방 입장 시 보스 활성화 ──────────────
                 if room.is_boss and self.boss and not self.boss.is_dead():
                     self.boss.activate(p.x, p.y, walls)
+                    if self._sm and not self._boss_bgm_playing:
+                        self._boss_bgm_playing = True
+                        self._sm.play_bgm("asset/Sound/bgm_boss1.wav")
 
         # ── 적 업데이트 ──────────────────────────────────
         for e in self.enemies:
@@ -649,6 +654,9 @@ class Stage1:
                     if not hasattr(self, '_clear_triggered'):
                         self._clear_triggered = True
                         self._start_dice()
+                        if self._sm:
+                            self._sm.play_bgm("asset/Sound/bgm_main.wav")
+                        self._boss_bgm_playing = False
                         gm.state = "ROOM_CLEAR"   # 보스방 클리어 → 주사위 보상
             else:
                 if enemies_dead and not room.reward_given:

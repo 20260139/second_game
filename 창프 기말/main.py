@@ -9,6 +9,9 @@ from scripts.lobby        import Lobby
 from scripts.stage1       import Stage1
 from scripts.settings     import Settings
 from scripts.sound_manager import SoundManager
+from scripts.screens      import (draw_title, draw_gameover, draw_clear,
+                                   draw_final_clear, reset_gameover,
+                                   reset_clear, reset_final_clear)
 
 pygame.init()
 
@@ -65,6 +68,7 @@ def canvas_to_screen(cx, cy):
 
 
 clock = pygame.time.Clock()
+_tick = 0
 
 # ── 게임 오브젝트 ──────────────────────────────────────────
 gm     = GameManager()
@@ -80,50 +84,17 @@ sm.play_bgm("asset/Sound/bgm_main.wav")
 
 def new_stage():
     global stage1
-    stage1 = Stage1(player, stage_num=gm.stage)
+    stage1 = Stage1(player, stage_num=gm.stage, sm=sm)
 
 
 # ── 화면 함수: canvas 대신 screen에 직접 그려 선명한 텍스트 ──
-def draw_gameover(gm):
-    sw, sh = screen.get_size()
-    screen.fill((10, 5, 15))
-    font1 = scaled_font(80)
-    font2 = scaled_font(34)
-    t1 = font1.render("GAME  OVER", True, (220, 50, 50))
-    t2 = font2.render(f"Score: {gm.score}    Coins: {gm.coins}", True, (180, 160, 200))
-    t3 = font2.render("Press  SPACE  to next stage", True, (140, 130, 160))
-    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh * 0.33)))
-    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh * 0.52)))
-    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.62)))
+def _draw_gameover_unused(): pass  # screens.py 로 이전
 
 
-def draw_clear(gm):
-    sw, sh = screen.get_size()
-    screen.fill((5, 15, 10))
-    font1 = scaled_font(80)
-    font2 = scaled_font(34)
-    t1 = font1.render("STAGE  CLEAR!", True, (100, 255, 160))
-    t2 = font2.render(f"Score: {gm.score}    Coins: {gm.coins}", True, (200, 240, 210))
-    t3 = font2.render("Press  R  to return to Lobby", True, (140, 180, 150))
-    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh * 0.33)))
-    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh * 0.52)))
-    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh * 0.62)))
+def _draw_clear_unused(): pass  # screens.py 로 이전
 
 
-def draw_final_clear(gm):
-    sw, sh = screen.get_size()
-    screen.fill((5, 5, 20))
-    font1 = scaled_font(70)
-    font2 = scaled_font(34)
-    font3 = scaled_font(26)
-    t1 = font1.render("ALL STAGES  CLEAR!", True, (255, 220, 60))
-    t2 = font2.render(f"Score: {gm.score}    Coins: {gm.coins}", True, (220, 200, 255))
-    t3 = font3.render("You conquered all 5 floors!", True, (180, 160, 220))
-    t4 = font2.render("Press  R  to start over", True, (140, 130, 160))
-    screen.blit(t1, (sw//2 - t1.get_width()//2, int(sh*0.22)))
-    screen.blit(t2, (sw//2 - t2.get_width()//2, int(sh*0.42)))
-    screen.blit(t3, (sw//2 - t3.get_width()//2, int(sh*0.52)))
-    screen.blit(t4, (sw//2 - t4.get_width()//2, int(sh*0.62)))
+def _draw_final_clear_unused(): pass  # screens.py 로 이전
 
 
 # ── 메인 루프 ─────────────────────────────────────────────
@@ -132,6 +103,7 @@ running = True
 while running:
 
     clock.tick(60)
+    _tick += 1
 
     scale, ox, oy = get_scale_and_offset()
 
@@ -149,6 +121,10 @@ while running:
             if event.key == pygame.K_ESCAPE:
                 running = False
 
+            if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
+                if gm.state == "TITLE":
+                    gm.state = "LOBBY"
+
             # ── 치트키 P: 공격력 +30, 최대HP +50 즉시 적용 ──
             if event.key == pygame.K_p:
                 player.damage  += 30
@@ -165,10 +141,12 @@ while running:
 
             if event.key in (pygame.K_r, pygame.K_e):
                 if gm.state == "GAMEOVER":
+                    reset_gameover()
                     lobby.on_enter_lobby()
                     gm.stage = 1
                     gm.state = "LOBBY"
                 elif gm.state == "FINAL_CLEAR":
+                    reset_final_clear()
                     lobby.on_enter_lobby()
                     gm.stage = 1
                     gm.score = 0
@@ -178,6 +156,7 @@ while running:
 
             if event.key == pygame.K_SPACE:
                 if gm.state == "CLEAR":
+                    reset_clear()
                     if gm.stage >= 5:
                         gm.state = "FINAL_CLEAR"
                     else:
@@ -226,7 +205,10 @@ while running:
     mouse_pos = screen_to_canvas(pygame.mouse.get_pos())
 
     # ── canvas에 게임 월드(타일·스프라이트 등) 그리기 ─────
-    if gm.state == "LOBBY":
+    if gm.state == "TITLE":
+        draw_title(canvas, _tick)
+
+    elif gm.state == "LOBBY":
         lobby.update(keys)
         lobby.draw(canvas, gm)
 
@@ -242,11 +224,11 @@ while running:
             stage1.draw_dice_popup(canvas, gm)
 
     # ── canvas → screen 스케일링 (최근접 보간으로 픽셀 유지) ─
-    if gm.state in ("LOBBY", "STAGE1", "ROOM_CLEAR", "MERCHANT", "SETTINGS"):
-        # 피격 시 화면 흔들림
+    if gm.state in ("TITLE", "LOBBY", "STAGE1", "ROOM_CLEAR", "MERCHANT", "SETTINGS"):
+        # 피격 화면 흔들림
         shake = getattr(player, 'screen_shake', 0)
         if shake > 0:
-            intensity = min(shake, 8)          # 최대 8px
+            intensity = min(shake, 8)
             shk_x = _rng.randint(-intensity, intensity)
             shk_y = _rng.randint(-intensity, intensity)
         else:
@@ -265,13 +247,13 @@ while running:
 
     # ── UI 텍스트는 screen에 직접 그려 선명하게 유지 ──────
     elif gm.state == "GAMEOVER":
-        draw_gameover(gm)
+        draw_gameover(screen, gm, _tick, scaled_font)
 
     elif gm.state == "CLEAR":
-        draw_clear(gm)
+        draw_clear(screen, gm, _tick, scaled_font)
 
     elif gm.state == "FINAL_CLEAR":
-        draw_final_clear(gm)
+        draw_final_clear(screen, gm, _tick, scaled_font)
 
     if gm.state == "MERCHANT" and stage1:
         stage1.merchant.draw(screen, gm)
