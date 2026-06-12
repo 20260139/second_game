@@ -1020,6 +1020,8 @@ class Stage1:
             vp_pos = self._canvas_to_vp(event.pos)
             b = self.player.try_shoot(vp_pos, cam_x, cam_y)
             if b:
+                if self._sm:
+                    self._sm.play_sfx("asset/Sound/sfx_attack.wav")
                 if hasattr(b, '_angle'):
                     self.slash_effects.append(b)
                 else:
