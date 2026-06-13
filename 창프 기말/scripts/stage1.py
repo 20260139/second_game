@@ -515,7 +515,15 @@ class Stage1:
                     self.boss.activate(p.x, p.y, walls)
                     if self._sm and not self._boss_bgm_playing:
                         self._boss_bgm_playing = True
-                        self._sm.play_bgm("asset/Sound/bgm_boss1.wav")
+                        bgm_map = {
+                            1: "asset/Sound/bgm_boss1.wav",
+                            2: "asset/Sound/bgm_boss2.wav",
+                            3: "asset/Sound/bgm_boss3.wav",
+                            4: "asset/Sound/bgm_boss4.wav",
+                            5: "asset/Sound/bgm_boss5.wav",
+                        }
+                        bgm_path = bgm_map.get(self.stage_num, "asset/Sound/bgm_boss1.wav")
+                        self._sm.play_bgm(bgm_path)
 
         # ── 적 업데이트 ──────────────────────────────────
         for e in self.enemies:

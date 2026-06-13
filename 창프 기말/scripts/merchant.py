@@ -262,12 +262,7 @@ class Merchant:
             pygame.draw.ellipse(screen, (80, 60, 110),
                                 (mx - int(26*scale), my - int(6*scale), int(52*scale), int(38*scale)))
 
-            fn = _get_font(max(8, int(14*scale)))
-            path_hint = fn.render("asset/Merchant/", True, (90, 75, 120))
-            fn2 = _get_font(max(8, int(14*scale)))
-            path_hint2 = fn2.render("merchant.png", True, (90, 75, 120))
-            screen.blit(path_hint,  (PX + IMG_W//2 - path_hint.get_width()//2,  PY + PH - int(52*scale)))
-            screen.blit(path_hint2, (PX + IMG_W//2 - path_hint2.get_width()//2, PY + PH - int(34*scale)))
+
 
         # 세로 구분선
         pygame.draw.line(screen, C_BORDER,

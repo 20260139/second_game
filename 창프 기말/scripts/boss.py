@@ -724,7 +724,11 @@ class Boss2(Boss):
         super().__init__(x, y)
         if Boss2._frames_cache is None:
             Boss2._frames_cache = _make_golem_frames()
-        self._anim      = Animation(Boss2._frames_cache, 8, loop=True)
+        _f = Boss2._frames_cache
+        self._anim_idle   = Animation(_f, 8, loop=True)
+        self._anim_attack = Animation(_f, 8, loop=True)
+        self._anim_walk   = Animation(_f, 8, loop=True)
+        self._anim        = self._anim_idle
         self._pattern   = B2_IDLE
         self._pat_timer = random.randint(60, 100)
         self._shield_on = False
@@ -969,7 +973,11 @@ class Boss3(Boss):
         super().__init__(x, y)
         if Boss3._frames_cache is None:
             Boss3._frames_cache = _make_witch_frames()
-        self._anim      = Animation(Boss3._frames_cache, 7, loop=True)
+        _f = Boss3._frames_cache
+        self._anim_idle   = Animation(_f, 7, loop=True)
+        self._anim_attack = Animation(_f, 7, loop=True)
+        self._anim_walk   = Animation(_f, 7, loop=True)
+        self._anim        = self._anim_idle
         self._pattern   = B3_IDLE
         self._pat_timer = random.randint(50, 90)
         self._blink_count = 0
@@ -1165,7 +1173,11 @@ class Boss4(Boss):
         super().__init__(x, y)
         if Boss4._frames_cache is None:
             Boss4._frames_cache = _make_drake_frames()
-        self._anim        = Animation(Boss4._frames_cache, 6, loop=True)
+        _f = Boss4._frames_cache
+        self._anim_idle   = Animation(_f, 6, loop=True)
+        self._anim_attack = Animation(_f, 6, loop=True)
+        self._anim_walk   = Animation(_f, 6, loop=True)
+        self._anim        = self._anim_idle
         self._pattern     = B4_IDLE
         self._pat_timer   = random.randint(50,90)
         self._thunder_ang = 0.0
@@ -1386,7 +1398,11 @@ class Boss5(Boss):
         super().__init__(x, y)
         if Boss5._frames_cache is None:
             Boss5._frames_cache = _make_chaos_frames()
-        self._anim          = Animation(Boss5._frames_cache, 5, loop=True)
+        _f = Boss5._frames_cache
+        self._anim_idle   = Animation(_f, 5, loop=True)
+        self._anim_attack = Animation(_f, 5, loop=True)
+        self._anim_walk   = Animation(_f, 5, loop=True)
+        self._anim        = self._anim_idle
         self._pattern       = B5_IDLE
         self._pat_timer     = random.randint(50,80)
         self._spiral_angle  = 0.0
