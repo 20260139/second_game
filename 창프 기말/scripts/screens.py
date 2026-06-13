@@ -155,6 +155,7 @@ _go_tick_offset = 0
 def draw_gameover(screen, gm, tick, scaled_font_fn):
     global _go_particles_spawned, _go_tick_offset
     sw, sh = screen.get_size()
+    sc = sh / 600   # 기준 해상도(600) 대비 스케일
 
     # 피처럼 번지는 배경
     t_ratio = min((tick - _go_tick_offset) / 60, 1.0)
@@ -188,8 +189,11 @@ def draw_gameover(screen, gm, tick, scaled_font_fn):
                (230, 45, 45), glow_col=(120,10,10), glow_r=5)
 
     # 구분선
+    line_off = int(80 * sc)
+    line_hw  = int(200 * sc)
     pygame.draw.line(screen, (180,30,30),
-                     (sw//2-200, t1y+80), (sw//2+200, t1y+80), 2)
+                     (sw//2-line_hw, t1y+line_off),
+                     (sw//2+line_hw, t1y+line_off), 2)
 
     # 스탯
     font2 = scaled_font_fn(32)
@@ -199,9 +203,11 @@ def draw_gameover(screen, gm, tick, scaled_font_fn):
         (f"Score  :  {gm.score}",        (200,180,140)),
         (f"Coins  :  {gm.coins}",        (220,200,100)),
     ]
+    row_gap = int(44 * sc)
     for i, (txt, col) in enumerate(stats):
         t = font2.render(txt, True, col)
-        screen.blit(t, (sw//2 - t.get_width()//2, t1y + 110 + i*44))
+        screen.blit(t, (sw//2 - t.get_width()//2,
+                        t1y + int(110 * sc) + i * row_gap))
 
     # 안내
     if (tick//25) % 2 == 0:
@@ -233,6 +239,7 @@ def _spawn_confetti(sw, sh):
 def draw_clear(screen, gm, tick, scaled_font_fn):
     global _cl_spawned, _cl_confetti
     sw, sh = screen.get_size()
+    sc = sh / 600
     screen.fill((4, 16, 10))
 
     # 빛 방사
@@ -278,11 +285,14 @@ def draw_clear(screen, gm, tick, scaled_font_fn):
     # 스테이지 번호
     font_st = scaled_font_fn(36)
     st_txt  = font_st.render(f"─  Floor {gm.stage}  Cleared  ─", True, (160,240,190))
-    screen.blit(st_txt, (sw//2 - st_txt.get_width()//2, t1y + 90))
+    screen.blit(st_txt, (sw//2 - st_txt.get_width()//2, t1y + int(90 * sc)))
 
     # 구분선
+    line_off = int(128 * sc)
+    line_hw  = int(220 * sc)
     pygame.draw.line(screen, (60,200,110),
-                     (sw//2-220, t1y+128), (sw//2+220, t1y+128), 1)
+                     (sw//2-line_hw, t1y+line_off),
+                     (sw//2+line_hw, t1y+line_off), 1)
 
     # 스탯
     font2 = scaled_font_fn(30)
@@ -292,9 +302,11 @@ def draw_clear(screen, gm, tick, scaled_font_fn):
         (f"Coins  :  {gm.coins}",             (255,230,80)),
         (f"Reroll Tickets  :  {gm.reroll_tickets}", (180,160,255)),
     ]
+    row_gap = int(42 * sc)
     for i, (txt, col) in enumerate(stats):
         t = font2.render(txt, True, col)
-        screen.blit(t, (sw//2 - t.get_width()//2, t1y + 148 + i*42))
+        screen.blit(t, (sw//2 - t.get_width()//2,
+                        t1y + int(148 * sc) + i * row_gap))
 
     # 안내
     if (tick//28) % 2 == 0:
@@ -351,14 +363,19 @@ def draw_final_clear(screen, gm, tick, scaled_font_fn):
     _glow_text(screen, txt1, font1, t1x, t1y,
                rc[:3], glow_col=(180,100,255), glow_r=5)
 
+    sc = sh / 600
+
     # 부제
     font_s2 = scaled_font_fn(36)
     sub2    = font_s2.render("You conquered all 5 floors!", True, (220,200,255))
-    screen.blit(sub2, (sw//2 - sub2.get_width()//2, t1y + 96))
+    screen.blit(sub2, (sw//2 - sub2.get_width()//2, t1y + int(96 * sc)))
 
     # 구분선
+    line_off = int(135 * sc)
+    line_hw  = int(240 * sc)
     pygame.draw.line(screen, (180,140,255),
-                     (sw//2-240, t1y+135), (sw//2+240, t1y+135), 1)
+                     (sw//2-line_hw, t1y+line_off),
+                     (sw//2+line_hw, t1y+line_off), 1)
 
     # 최종 스탯
     font2 = scaled_font_fn(30)
@@ -367,13 +384,15 @@ def draw_final_clear(screen, gm, tick, scaled_font_fn):
         (f"Final Score  :  {gm.score}",  (255,240,100)),
         (f"Coins Earned :  {gm.coins}",  (255,220,60)),
     ]
+    row_gap = int(44 * sc)
     for i, (txt, col) in enumerate(stats):
         t = font2.render(txt, True, col)
-        screen.blit(t, (sw//2 - t.get_width()//2, t1y + 158 + i*44))
+        screen.blit(t, (sw//2 - t.get_width()//2,
+                        t1y + int(158 * sc) + i * row_gap))
 
     # 감사 메시지
     thx = scaled_font_fn(26).render("Thank you for playing!", True, (180,160,220))
-    screen.blit(thx, (sw//2 - thx.get_width()//2, t1y + 268))
+    screen.blit(thx, (sw//2 - thx.get_width()//2, t1y + int(268 * sc)))
 
     # 안내
     if (tick//30) % 2 == 0:
